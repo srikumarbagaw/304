@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>304 Table Stats</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:dark;
+  --table:#171c38;--table-2:#212852;--table-3:#2c3566;
+  --ink:#efe9dc;--muted:#a9acc8;--faint:#6f7499;--line:rgba(239,233,220,.13);
+  --ns:#ec8f3e;--ew:#5cc0b3;
+  --disp:"Rozha One","Georgia","Times New Roman",serif;
+  --ui:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+body{margin:0;background:var(--table);background-image:radial-gradient(1100px 600px at 30% 0%,#222a54 0%,var(--table) 60%);color:var(--ink);font:15px/1.5 var(--ui)}
+.wrap{max-width:960px;margin:0 auto;padding-inline:16px;padding-block:22px 40px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand{font-family:var(--disp);font-size:44px;line-height:1;color:var(--ns);text-decoration:none}
+h1{margin:0;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.live{margin-left:auto;display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.on{background:var(--ew);box-shadow:0 0 0 0 rgba(92,192,179,.6);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 8px rgba(92,192,179,0)}100%{box-shadow:0 0 0 0 rgba(92,192,179,0)}}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:720px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:rgba(18,22,48,.6);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.tile .n{font-family:var(--disp);font-size:44px;line-height:1.05;font-variant-numeric:tabular-nums}
+.tile .l{font-size:13px;color:var(--muted);font-weight:600}
+.tile.hero .n{color:var(--ns)}
+.tile.teal .n{color:var(--ew)}
+.panel{background:rgba(18,22,48,.6);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.panel h2{margin:0 0 10px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:720px){.split{grid-template-columns:minmax(0,1fr)}}
+.bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--table-2);margin:4px 0 10px}
+.bar i{display:block;height:100%}
+.legend{display:grid;grid-template-columns:auto 1fr auto;gap:5px 10px;font-size:14px;align-items:center;font-variant-numeric:tabular-nums}
+.legend .sw{width:10px;height:10px;border-radius:2px}
+.legend b{font-weight:700;text-align:right}
+.tables{display:flex;flex-direction:column;gap:6px}
+.trow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);font-variant-numeric:tabular-nums}
+.seats{display:flex;gap:3px}
+.seats i{width:12px;height:16px;border-radius:2px;background:var(--table-3)}
+.seats i.h{background:var(--ns)}
+.pill{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+.pill.play{background:rgba(92,192,179,.16);color:var(--ew)}
+.pill.wait{background:var(--table-3);color:var(--muted)}
+.empty{color:var(--faint);font-size:14px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{text-align:right;padding:6px 6px;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600;font-size:12.5px}
+.chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:8px}
+.chart .c{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;min-width:0}
+.chart .col{width:100%;max-width:28px;border-radius:4px 4px 0 0;background:var(--ns);min-height:2px}
+.chart .d{font-size:10px;color:var(--faint)}
+.note{color:var(--muted);font-size:14px}
+.note code{background:var(--table-2);padding:1px 6px;border-radius:4px}
+a{color:var(--ns)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="./">304</a>
+    <h1>Live table stats</h1>
+    <span class="live"><span class="dot" id="dot"></span><span id="liveTxt">Connecting…</span></span>
+  </header>
+
+  <div class="panel note" id="setup" hidden>
+    Stats aren't switched on yet. Add your Firebase settings to <code>config.js</code> in the GitHub repository, then reload this page.
+  </div>
+
+  <section class="tiles" aria-label="Right now">
+    <div class="tile hero"><span class="n" id="tOnline">–</span><span class="l">People online now</span></div>
+    <div class="tile teal"><span class="n" id="tTables">–</span><span class="l">Online tables open</span></div>
+    <div class="tile"><span class="n" id="tAtTables">–</span><span class="l">Players at online tables</span></div>
+    <div class="tile"><span class="n" id="tSolo">–</span><span class="l">Playing the computer</span></div>
+  </section>
+
+  <div class="split">
+    <section class="panel">
+      <h2>What people are doing</h2>
+      <div class="bar" id="modeBar"></div>
+      <div class="legend" id="modeLegend"></div>
+    </section>
+    <section class="panel">
+      <h2>Online tables</h2>
+      <div class="tables" id="tableList"><div class="empty">No tables open right now.</div></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <h2>Visits, last 14 days</h2>
+    <div class="chart" id="chart"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Totals</h2>
+    <table>
+      <thead><tr><th></th><th>Today</th><th>All time</th></tr></thead>
+      <tbody id="totals"></tbody>
+    </table>
+    <p class="note" style="margin:10px 0 0;font-size:12.5px;color:var(--faint)">Days follow UTC. A visit is one opening of the game page. Only anonymous counts are stored: no names, cards or table codes.</p>
+  </section>
+</div>
+
+<script src="config.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const MODES=[['player','Joined an online table','var(--ew)'],['host','Hosting a table','#8fd6cc'],['solo','Playing the computer','var(--ns)'],['menu','On the menu screen','var(--table-3)']];
+const fmtN=n=>(n||0).toLocaleString();
+function mins(ms){const m=Math.max(0,Math.round(ms/60000));return m<60?`${m} min`:`${Math.floor(m/60)} h ${m%60} min`;}
+function dayKey(d){return d.toISOString().slice(0,10);}
+function loadScript(src){return new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=no;document.head.appendChild(e);});}
+
+let presence={},tables={},stats={},daily={},offset=0;
+function draw(){
+  const list=Object.values(presence);
+  const count=m=>list.filter(p=>p.mode===m).length;
+  const tlist=Object.values(tables);
+  $('#tOnline').textContent=fmtN(list.length);
+  $('#tTables').textContent=fmtN(tlist.length);
+  $('#tAtTables').textContent=fmtN(count('host')+count('player'));
+  $('#tSolo').textContent=fmtN(count('solo'));
+  const total=list.length||1;
+  $('#modeBar').innerHTML=MODES.map(([m,,c])=>`<i style="width:${count(m)/total*100}%;background:${c}"></i>`).join('');
+  $('#modeLegend').innerHTML=MODES.map(([m,l,c])=>`<span class="sw" style="background:${c}"></span><span>${l}</span><b>${count(m)}</b>`).join('');
+  const now=Date.now()+offset;
+  tlist.sort((a,b)=>(a.since||0)-(b.since||0));
+  $('#tableList').innerHTML=tlist.length?tlist.map((t,i)=>{
+    const h=Math.min(4,t.players||1);let seats='';for(let k=0;k<4;k++)seats+=`<i class="${k<h?'h':''}"></i>`;
+    const st=t.started?`<span class="pill play">Hand ${t.hand||1}</span>`:'<span class="pill wait">Waiting</span>';
+    return `<div class="trow"><span class="seats" title="${h} of 4 seats taken by people">${seats}</span><span>${h} ${h>1?'people':'person'}${4-h?` · ${4-h} computer`:''} · open ${mins(now-(t.since||now))}</span>${st}</div>`;
+  }).join(''):'<div class="empty">No tables open right now.</div>';
+  // chart
+  const days=[];for(let i=13;i>=0;i--){const d=new Date(Date.now()-i*86400000);days.push(dayKey(d));}
+  const vals=days.map(d=>(daily[d]&&daily[d].visits)||0),max=Math.max(1,...vals);
+  $('#chart').innerHTML=days.map((d,i)=>`<div class="c" title="${d}: ${vals[i]} visits"><div class="col" style="height:${vals[i]/max*96}px;opacity:${i===13?1:.7}"></div><span class="d">${d.slice(8)}</span></div>`).join('');
+  const today=daily[dayKey(new Date())]||{};
+  const rows=[['Visits','visits'],['Games vs computer','soloGames'],['Online games','onlineGames']];
+  $('#totals').innerHTML=rows.map(([l,k])=>`<tr><td>${l}</td><td>${fmtN(today[k])}</td><td>${fmtN(stats[k])}</td></tr>`).join('');
+}
+async function start(){
+  const cfg=window.T304_FIREBASE;
+  if(!cfg||!cfg.databaseURL||/PASTE/.test(JSON.stringify(cfg))){$('#setup').hidden=false;$('#liveTxt').textContent='Not set up';draw();return;}
+  try{
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js');
+    const db=firebase.initializeApp(cfg,'stats').database();
+    db.ref('.info/connected').on('value',s=>{const on=s.val()===true;$('#dot').classList.toggle('on',on);$('#liveTxt').textContent=on?'Live':'Reconnecting…';});
+    db.ref('.info/serverTimeOffset').on('value',s=>{offset=s.val()||0;});
+    db.ref('presence').on('value',s=>{presence=s.val()||{};draw();});
+    db.ref('tables').on('value',s=>{tables=s.val()||{};draw();});
+    db.ref('stats').on('value',s=>{stats=s.val()||{};draw();});
+    const from=dayKey(new Date(Date.now()-14*86400000));
+    db.ref('daily').orderByKey().startAt(from).on('value',s=>{daily=s.val()||{};draw();});
+    setInterval(draw,30000);
+  }catch(e){$('#liveTxt').textContent="Couldn't connect";}
+}
+start();
+</script>
+</body>
+</html>

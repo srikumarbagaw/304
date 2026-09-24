@@ -291,6 +291,7 @@ details p{color:var(--muted);font-size:12.5px;margin:8px 0 0}
       <p class="lnote" id="setnote" hidden>The host controls the other settings.</p>
       <label><input type="checkbox" id="optStrict"><span>Strict Caps<small>Players must call Caps themselves at the first chance. Off: it's called for them.</small></span></label>
       <label><input type="checkbox" id="optRule100"><span>100 rule<small>On a second turn, or when your partner holds the bid, you must bid 100 or more (or pass).</small></span></label>
+      </div>
       <label><input type="checkbox" id="optFast"><span>Fast play<small>Shorter pauses between cards.</small></span></label>
       <label style="align-items:center"><span>Tokens per team</span><select id="optTokens"><option value="11">11 (full game)</option><option value="5">5 (short game)</option></select></label>
       <div class="row" style="justify-content:flex-start">
@@ -304,6 +305,7 @@ details p{color:var(--muted);font-size:12.5px;margin:8px 0 0}
 <div class="lobby" id="lobby"><div class="lcard" id="lcard"></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="config.js"></script>
 <script>
 /* ================= constants ================= */
 const SUITS=['S','H','C','D'];
@@ -668,6 +670,7 @@ function newGame(){
   const st=S?S.settings:{strict:false,fast:false,tokens:11,rule100:true};
   S=freshState(st.tokens);S.settings={...st};
   log(`New game · ${st.tokens} tokens each. Take them all to win.`,'h');
+  if(ROLE!=='client') trackGameStarted();
   startHand();
 }
 
@@ -1118,6 +1121,7 @@ function render(){
     pill.textContent=ROLE==='host'?`Hosting ${NET.code} · ${humans} player${humans>1?'s':''}`:`Online · table ${NET.code}`;
   }
   if(ROLE==='host') broadcastState();
+  trackSync();
 }
 
 /* ================= peer-to-peer networking (PeerJS / WebRTC) ================= */
@@ -1330,6 +1334,7 @@ function seatRole(p,me){
   return p===partner(me)?'<i>Partner</i>':'<i class="ew">Opponent</i>';
 }
 function renderLobby(){
+  trackSync();
   const box=$('#lobby'),card=$('#lcard');
   box.hidden=LOBBY.mode==='hidden';
   if(box.hidden) return;
@@ -1476,6 +1481,64 @@ $('#optTokens').addEventListener('change',e=>{if(ROLE==='client')return;S.settin
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(S)$('#hand').innerHTML=handHTML();},150);});
 window.addEventListener('beforeunload',()=>{try{if(NET.peer)NET.peer.destroy();}catch(e){}});
 
+
+
+/* ================= usage stats (optional; active only when config.js has Firebase settings) ================= */
+// Records anonymously: who is online now and in which mode, which online tables are open, and daily visit/game counts.
+// No names, cards or table codes are stored.
+const TRACK={db:null,ref:null,tref:null,key:'',tkey:'',tid:null};
+const FB_VER='10.12.2';
+function loadScript(src){return new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=no;document.head.appendChild(e);});}
+function dayKey(){return new Date().toISOString().slice(0,10);}
+async function trackInit(){
+  const cfg=window.T304_FIREBASE;
+  if(!cfg||!cfg.databaseURL||/PASTE/.test(JSON.stringify(cfg))) return;
+  try{
+    await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app-compat.js`);
+    await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-database-compat.js`);
+    const app=firebase.initializeApp(cfg,'t304');
+    TRACK.db=app.database();
+    const sid=Math.random().toString(36).slice(2,12);
+    TRACK.ref=TRACK.db.ref('presence/'+sid);
+    TRACK.ref.onDisconnect().remove();
+    TRACK.db.ref('.info/connected').on('value',snap=>{ if(snap.val()===true){ TRACK.ref.onDisconnect().remove(); TRACK.key=''; trackSync(); } });
+    bump('visits');
+    trackSync();
+  }catch(e){ console.warn('Stats disabled:',e); TRACK.db=null; }
+}
+function bump(k){
+  if(!TRACK.db) return;
+  const inc=firebase.database.ServerValue.increment(1);
+  TRACK.db.ref('stats/'+k).set(inc).catch(()=>{});
+  TRACK.db.ref('daily/'+dayKey()+'/'+k).set(inc).catch(()=>{});
+}
+function trackGameStarted(){ bump(ROLE==='host'?'onlineGames':'soloGames'); }
+function trackSync(){
+  if(!TRACK.db||!TRACK.ref) return;
+  let mode;
+  if(ROLE==='host') mode='host';
+  else if(ROLE==='client') mode='player';
+  else mode=(S&&typeof LOBBY!=='undefined'&&LOBBY.mode==='hidden')?'solo':'menu';
+  const key=mode;
+  if(key!==TRACK.key){
+    TRACK.key=key;
+    TRACK.ref.set({mode,t:firebase.database.ServerValue.TIMESTAMP}).catch(()=>{});
+  }
+  // one record per open online table, kept by its host
+  if(ROLE==='host'&&NET.code){
+    if(!TRACK.tid){TRACK.tid=Math.random().toString(36).slice(2,12);TRACK.tref=TRACK.db.ref('tables/'+TRACK.tid);TRACK.tref.onDisconnect().remove();TRACK.tkey='';TRACK.tStart=Date.now();}
+    const humans=1+Object.values(NET.conns).filter(c=>c&&c.open).length;
+    const started=!!(S&&LOBBY.mode==='hidden');
+    const tk=`${humans}|${started}|${started?S.handNo:0}`;
+    if(tk!==TRACK.tkey){
+      TRACK.tkey=tk;
+      TRACK.tref.set({players:humans,started,hand:started?S.handNo:0,since:TRACK.tStart}).catch(()=>{});
+    }
+  } else if(TRACK.tref){
+    TRACK.tref.remove().catch(()=>{});TRACK.tref.onDisconnect().cancel();TRACK.tref=null;TRACK.tid=null;TRACK.tkey='';
+  }
+}
+trackInit();
 /* ================= boot ================= */
 (function boot(){
   const j=new URLSearchParams(location.search).get('join');
