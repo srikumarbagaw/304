@@ -287,7 +287,8 @@ details p{color:var(--muted);font-size:12.5px;margin:8px 0 0}
     </div>
     <div class="panel set" id="setpanel">
       <h2>Table settings</h2>
-      <p class="lnote" id="setnote" hidden>The host controls these settings.</p>
+      <label class="field" style="cursor:auto;align-items:stretch">Your name<input id="optName" maxlength="16" autocomplete="nickname"></label>
+      <p class="lnote" id="setnote" hidden>The host controls the other settings.</p>
       <label><input type="checkbox" id="optStrict"><span>Strict Caps<small>Players must call Caps themselves at the first chance. Off: it's called for them.</small></span></label>
       <label><input type="checkbox" id="optRule100"><span>100 rule<small>On a second turn, or when your partner holds the bid, you must bid 100 or more (or pass).</small></span></label>
       <label><input type="checkbox" id="optFast"><span>Fast play<small>Shorter pauses between cards.</small></span></label>
@@ -883,7 +884,7 @@ function seatHTML(p){
   return `<div class="who"><div class="name"><span class="tm" style="background:${tcol(p)}"></span>${label}</div><div class="tag-row">${badges(p)}</div></div>${bubbleHTML(p)}<div class="minis">${minis}</div>${ind}${pileHTML(p)}`;
 }
 function southBar(){
-  const me=ROLE==='solo'?'You · South':`You · ${esc(S.names[ME])}`;
+  const me=`You · ${esc(S.names[ME])}`;
   return `<span class="name"><span class="tm" style="background:var(--ns)"></span>${me}</span>${badges(ME)}${S.bubbles[ME]?`<span class="chip">${esc(S.bubbles[ME])}</span>`:''}${pileHTML(ME)}`;
 }
 function trumpCorner(){
@@ -1103,6 +1104,7 @@ function render(){
   $('#last').innerHTML=lastHTML();
   renderLog();
   $('#optStrict').checked=S.settings.strict;$('#optFast').checked=S.settings.fast;$('#optRule100').checked=S.settings.rule100!==false;$('#optTokens').value=String(S.settings.tokens);
+  const on=$('#optName');if(on&&document.activeElement!==on) on.value=S.names[ME]||'';
   const client=ROLE==='client';
   ['#optStrict','#optFast','#optRule100','#optTokens'].forEach(id=>$(id).disabled=client);
   $('#setnote').hidden=!client;
@@ -1223,6 +1225,12 @@ function onHostData(conn,d){
       delete NET.conns[seat];NET.conns[to]=conn;conn.seat=to;
       broadcastLobby();
     }
+    return;
+  }
+  if(d.type==='rename'){
+    const v=String(d.name||'').trim().slice(0,16);if(!v)return;
+    if(LOBBY.mode==='host'){NET.lobby.seats[seat].name=uniqueName(v,seat);broadcastLobby();}
+    else if(S){S.names[seat]=v;TABLE.names[seat]=v;render();}
     return;
   }
   if(d.type==='act'&&S&&LOBBY.mode==='hidden') doAction(seat,d.a);
@@ -1354,7 +1362,7 @@ function renderLobby(){
       const s=seats[p];
       const posTxt=`${SEATPOS[p]} · ${seatRole(p,0)}`;
       let mid,tag;
-      if(p===0){mid=`<span class="nm">${esc(s.name)}</span>`;tag='<span class="chip m">Host</span>';}
+      if(p===0){mid=`<input data-seatname="0" maxlength="16" value="${esc(s.name)}" aria-label="Your name">`;tag='<span class="chip m">Host · you</span>';}
       else if(s.kind==='human'){mid=`<span class="nm">${esc(s.name)}</span>`;tag='<span class="chip on">Joined</span>';}
       else {mid=`<input data-seatname="${p}" maxlength="16" value="${esc(s.name)}" aria-label="Name for the computer player at ${SEATPOS[p]}">`;tag='<span class="chip ai">Computer</span>';}
       return `<div class="seatrow ${p===0?'me':''}"><span class="pos">${posTxt}</span>${mid}${tag}</div>`;
@@ -1378,7 +1386,8 @@ function renderLobby(){
       else if(s.kind==='host') tag='<span class="chip on">Host</span>';
       else if(s.kind==='human') tag='<span class="chip on">Joined</span>';
       else tag=`<button class="btn" data-lob="sit" data-seat="${p}">Sit here</button>`;
-      return `<div class="seatrow ${p===you?'me':''}"><span class="pos">${posTxt}</span><span class="nm">${esc(s.name)}${s.kind==='ai'?' <span class="chip ai">Computer</span>':''}</span>${tag}</div>`;
+      const nmHTML=p===you?`<input id="myWaitName" maxlength="16" value="${esc(s.name)}" aria-label="Your name">`:`<span class="nm">${esc(s.name)}${s.kind==='ai'?' <span class="chip ai">Computer</span>':''}</span>`;
+      return `<div class="seatrow ${p===you?'me':''}"><span class="pos">${posTxt}</span>${nmHTML}${tag}</div>`;
     }).join('');
     card.innerHTML=`<h3>You're at ${esc(seats[0].name)}'s table</h3>
       <p class="lsub">Table ${esc(NET.code)}. Pick an open seat if you like. The game starts when the host is ready.</p>
@@ -1391,6 +1400,7 @@ document.addEventListener('input',e=>{
   if(e.target.id==='codeIn') e.target.value=e.target.value.toUpperCase().replace(/[^A-Z]/g,'');
   if(e.target.dataset&&e.target.dataset.seatname){
     const p=+e.target.dataset.seatname;NET.lobby.seats[p].name=e.target.value.slice(0,16);
+    if(p===0) saveName(e.target.value.trim());
     for(const [q,c] of Object.entries(NET.conns)) if(c&&c.open) try{c.send({...lobbyPayload(),you:+q});}catch(err){}
   }
 });
@@ -1402,7 +1412,7 @@ document.addEventListener('click',e=>{
   const a=el.dataset.lob;
   if(a==='solo'){
     saveName(getMyName());
-    ROLE='solo';ME=0;TABLE={names:['South','East','North','West'],humans:[true,false,false,false]};
+    ROLE='solo';ME=0;TABLE={names:[getMyName(),'East','North','West'],humans:[true,false,false,false]};
     LOBBY.mode='hidden';LOBBY.err='';renderLobby();S=null;newGame();return;
   }
   if(a==='host'){saveName(getMyName());LOBBY.err='';startHosting();return;}
@@ -1448,6 +1458,17 @@ document.addEventListener('click',e=>{
   if(a==='card'){ if(ph==='indicator') act({t:'indicator',card:el.dataset.card}); else act({t:'play',card:el.dataset.card}); return; }
   if(a==='ind'){act({t:'play',ind:true});return;}
 });
+function setMyName(v){
+  v=String(v||'').trim().slice(0,16);if(!v)return;
+  saveName(v);
+  if(ROLE==='client'){ if(NET.conn&&NET.conn.open) NET.conn.send({type:'rename',name:v}); return; }
+  if(S){S.names[ME]=v;TABLE.names[ME]=v;render();}
+}
+document.addEventListener('change',e=>{
+  if(e.target.id==='optName') setMyName(e.target.value);
+  if(e.target.id==='myWaitName') setMyName(e.target.value);
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&(e.target.id==='optName'||e.target.id==='myWaitName')) e.target.blur(); });
 $('#optStrict').addEventListener('change',e=>{if(ROLE==='client')return;S.settings.strict=e.target.checked;render();});
 $('#optFast').addEventListener('change',e=>{if(ROLE==='client')return;S.settings.fast=e.target.checked;render();});
 $('#optRule100').addEventListener('change',e=>{if(ROLE==='client')return;S.settings.rule100=e.target.checked;render();});
