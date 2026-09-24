@@ -314,7 +314,7 @@ const STR={J:8,'9':7,A:6,'10':5,K:4,Q:3,'8':2,'7':1};
 const PTS={J:30,'9':20,A:11,'10':10,K:3,Q:2,'8':0,'7':0};
 const RNAME={J:'Jack','9':'Nine',A:'Ace','10':'Ten',K:'King',Q:'Queen','8':'Eight','7':'Seven'};
 const ALL=[];SUITS.forEach(s=>RANKS.forEach(r=>ALL.push(r+s)));
-const SEATPOS=['South','East','North','West'];
+const SEATPOS=['Ellalan','Cholan','Cheran','Pandiyan'];
 const rk=c=>c.slice(0,-1), su=c=>c.slice(-1), pts=c=>PTS[rk(c)]||0, str=c=>STR[rk(c)]||0;
 const team=p=>p%2, partner=p=>(p+2)%4;
 const fmt=c=>rk(c)+SYM[su(c)];
@@ -330,7 +330,7 @@ const tn=t=>`⟦t${t}⟧`;                 // team label
 
 let S=null, timer=null, bidSel=150, bidKey='';
 let ME=0, ROLE='solo';                 // ROLE: solo | host | client
-let TABLE={names:['South','East','North','West'],humans:[true,false,false,false]};
+let TABLE={names:['Ellalan','Cholan','Cheran','Pandiyan'],humans:[true,false,false,false]};
 
 const BL=b=>(b==='PCC'||b===999)?'PCC':String(b<=200?b-100:b);
 const ALLOW=b=>Math.floor((304-b)/10);
@@ -1162,7 +1162,7 @@ function uniqueName(name,seat){
 function startHosting(){
   if(!peerAvailable()){lobbyError("Online play couldn't load. Check your internet connection, then try again.");return;}
   const myName=getMyName();
-  NET.lobby={seats:[{name:myName,kind:'host'},{name:'East',kind:'ai'},{name:'North',kind:'ai'},{name:'West',kind:'ai'}]};
+  NET.lobby={seats:[{name:myName,kind:'host'},{name:'Cholan',kind:'ai'},{name:'Cheran',kind:'ai'},{name:'Pandiyan',kind:'ai'}]};
   LOBBY.intent='host';LOBBY.mode='connecting';LOBBY.msg='Opening your table…';renderLobby();
   clearTimeout(NET.joinTimer);
   NET.joinTimer=setTimeout(()=>{if(LOBBY.mode==='connecting')lobbyError("Couldn't reach the connection service. Check your internet connection and try again.");},15000);
@@ -1297,7 +1297,7 @@ function leaveTable(){
   try{if(NET.peer)NET.peer.destroy();}catch(e){}
   NET.peer=null;NET.conn=null;NET.conns={};NET.code='';NET.seenPlays=new Set();
   ROLE='solo';ME=0;S=null;
-  TABLE={names:['South','East','North','West'],humans:[true,false,false,false]};
+  TABLE={names:['Ellalan','Cholan','Cheran','Pandiyan'],humans:[true,false,false,false]};
   LOBBY.mode='home';LOBBY.err='';renderLobby();
 }
 
@@ -1412,7 +1412,7 @@ document.addEventListener('click',e=>{
   const a=el.dataset.lob;
   if(a==='solo'){
     saveName(getMyName());
-    ROLE='solo';ME=0;TABLE={names:[getMyName(),'East','North','West'],humans:[true,false,false,false]};
+    ROLE='solo';ME=0;TABLE={names:[getMyName(),'Cholan','Cheran','Pandiyan'],humans:[true,false,false,false]};
     LOBBY.mode='hidden';LOBBY.err='';renderLobby();S=null;newGame();return;
   }
   if(a==='host'){saveName(getMyName());LOBBY.err='';startHosting();return;}
